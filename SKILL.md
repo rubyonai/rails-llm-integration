@@ -3,19 +3,21 @@ name: rails-llm-integration
 description: >
   Production-grade LLM integration patterns for Ruby on Rails applications.
   USE THIS SKILL when the user needs to: integrate OpenAI, Claude, or any LLM API
-  into a Rails app; build AI-powered features in Rails; manage prompts as templates;
-  route between LLM models for cost optimization; run LLM calls as background jobs;
-  set up Braintrust evals; use LiteLLM or Portkey as a proxy; track LLM costs;
-  test AI features; audit LLM usage patterns; build RAG pipelines in Rails;
-  add classification, summarization, extraction, or generation features to Rails;
-  manage LLM API keys and budgets; handle LLM errors and retries; or adopt
-  conventions for LLM service objects similar to ActionMailer or ActiveJob patterns.
+  into a Rails app; use ruby_llm gem or langchain-rb gem in Rails; build AI-powered
+  features in Rails; manage prompts as templates; route between LLM models for cost
+  optimization; run LLM calls as background jobs; set up Braintrust evals; use
+  LiteLLM or Portkey as a proxy; track LLM costs; test AI features; audit LLM usage
+  patterns; build RAG pipelines in Rails with langchain-rb; add classification,
+  summarization, extraction, or generation features to Rails; manage LLM API keys
+  and budgets; handle LLM errors and retries; or adopt conventions for LLM service
+  objects similar to ActionMailer or ActiveJob patterns.
   Triggers on: LLM in Rails, OpenAI Rails integration, Claude API Ruby,
   Anthropic SDK Rails, AI features Rails, prompt engineering Ruby, model routing,
   LLM cost optimization, Braintrust Rails, eval pipeline Ruby, background LLM jobs,
   async AI calls, LLM service objects, prompt templates Rails, ruby-openai gem,
-  anthropic-rb gem, ruby-llm gem, faraday LLM, LLM anti-patterns Rails,
-  audit LLM calls, AI service objects, Rails AI conventions.
+  anthropic-rb gem, ruby-llm gem, ruby_llm gem, langchain-rb gem, langchainrb,
+  faraday LLM, LLM anti-patterns Rails, audit LLM calls, AI service objects,
+  Rails AI conventions, RAG Rails, vector search Rails, pgvector Rails.
 ---
 
 # Rails LLM Integration Skill
@@ -29,9 +31,10 @@ and ActionController (HTTP). Instead of scattered API calls, you get conventions
 ## When to Use
 
 - Adding any AI/LLM feature to a Rails application
-- Integrating OpenAI, Anthropic Claude, Cohere, or any LLM provider
+- Using ruby_llm gem, langchain-rb gem, ruby-openai, or anthropic-rb in Rails
 - Setting up prompt management, model routing, or cost tracking
 - Building eval pipelines with Braintrust
+- Building RAG pipelines with langchain-rb and pgvector
 - Auditing existing LLM usage for anti-patterns
 - Testing AI-powered features
 
@@ -67,6 +70,8 @@ lib/
     clients/
       openai_client.rb        # Wraps ruby-openai gem
       anthropic_client.rb     # Wraps anthropic-rb gem
+      ruby_llm_client.rb      # Wraps ruby_llm gem (multi-provider)
+      langchain_client.rb     # Wraps langchain-rb gem
       proxy_client.rb         # LiteLLM/Portkey via Faraday
       stub_client.rb          # Test double
     config.rb                 # Loads config/llm.yml
@@ -92,7 +97,7 @@ rails generate llm:service ProductDescription generation  # Scaffold a new servi
 
 | File | Read When You Need To... |
 |------|--------------------------|
-| `references/client-setup.md` | Wire up ruby-openai, anthropic-rb, or proxy clients (start here) |
+| `references/client-setup.md` | Wire up ruby_llm, langchain-rb, ruby-openai, anthropic-rb, or proxy clients (start here) |
 | `references/service-patterns.md` | Build LLM service objects with Result, tracing, retries |
 | `references/job-patterns.md` | Make LLM calls async with ActiveJob + Sidekiq |
 | `references/proxy-routing.md` | Route between models, optimize costs, set budgets |
@@ -105,9 +110,9 @@ rails generate llm:service ProductDescription generation  # Scaffold a new servi
 
 ## Core Principles
 
-1. **Rails conventions over LLM frameworks** -- No langchain-rb, no heavy abstractions.
-   Use service objects, ActiveJob, ERB templates, and YAML config. Tools Rails devs
-   already know.
+1. **Rails conventions wrap LLM libraries** -- ruby_llm and langchain-rb are the engine,
+   Rails patterns are the chassis. Use service objects, ActiveJob, ERB templates, and
+   YAML config. The gem handles the API; the convention handles everything else.
 
 2. **Async by default** -- Every LLM call goes through ActiveJob unless the user is
    actively waiting (streaming). Never block a web request on a 3-second API call.

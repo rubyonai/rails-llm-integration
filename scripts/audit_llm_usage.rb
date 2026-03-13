@@ -25,11 +25,15 @@ class LLMAuditor
   }.freeze
   RESET = "\e[0m"
 
-  # Patterns that indicate direct LLM client usage
+  # Patterns that indicate direct LLM client usage outside BaseService
   DIRECT_CLIENT_PATTERNS = [
     /OpenAI::Client\.new/,
     /Anthropic::Client\.new/,
     /Cohere::Client\.new/,
+    /RubyLLM\.chat(?!\s*#)/,                   # Direct ruby_llm usage
+    /RubyLLM\.paint/,                            # Direct ruby_llm image generation
+    /Langchain::LLM::\w+\.new/,                  # Direct langchain-rb LLM instantiation
+    /Langchain::Vectorsearch::\w+\.new/,          # Direct langchain-rb vector search
     /\.chat\(\s*model:/,
     /\.completions\.create/,
     /\.messages\.create/

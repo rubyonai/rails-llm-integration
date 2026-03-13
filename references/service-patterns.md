@@ -1,7 +1,9 @@
 # LLM Service Patterns
 
 The Rails convention for LLM service objects. Every LLM call in your app goes through
-a service that inherits from `LLM::BaseService`.
+a service that inherits from `LLM::BaseService`. This pattern works identically whether
+you're using ruby_llm, langchain-rb, ruby-openai, or anthropic-rb — the client layer
+handles the gem, the service layer handles your business logic.
 
 ## Error Taxonomy
 

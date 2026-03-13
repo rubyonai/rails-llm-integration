@@ -1,6 +1,6 @@
 # Rails LLM Integration — Claude Skill
 
-**Stop scattering raw API calls across your Rails app.** This Claude skill teaches production-grade LLM integration patterns that follow Rails conventions — treating AI calls the way Rails treats email (ActionMailer), jobs (ActiveJob), and config (database.yml).
+**Stop scattering raw API calls across your Rails app.** This Claude skill teaches production-grade LLM integration patterns that follow Rails conventions — treating AI calls the way Rails treats email (ActionMailer), jobs (ActiveJob), and config (database.yml). Works with **ruby_llm**, **langchain-rb**, **ruby-openai**, and **anthropic-rb**.
 
 ## The Problem
 
@@ -44,7 +44,7 @@ Read `SKILL.md` for the architecture overview, then dive into the reference file
 | File | Description |
 |------|-------------|
 | `SKILL.md` | Skill definition, architecture overview, core principles |
-| `references/client-setup.md` | ruby-openai + anthropic-rb client wrappers, proxy client, normalized response shape |
+| `references/client-setup.md` | ruby_llm, langchain-rb, ruby-openai, anthropic-rb client wrappers, proxy client, normalized response shape |
 | `references/service-patterns.md` | LLM::BaseService, Result objects, concerns, error taxonomy |
 | `references/job-patterns.md` | ActiveJob conventions, queue strategy, batch processing, dead letters |
 | `references/proxy-routing.md` | Model routing, cost optimization, budgets, shadow experiments |
@@ -74,9 +74,19 @@ Read `SKILL.md` for the architecture overview, then dive into the reference file
 
 ## Quick Start
 
-1. Add gems to your Gemfile:
+1. Add gems to your Gemfile (pick one approach):
 
 ```ruby
+# Option A: ruby_llm (recommended — multi-provider, clean DSL)
+gem "ruby_llm", "~> 1.0"
+gem "redis", "~> 5.0"
+
+# Option B: langchain-rb (for RAG, vector search, agents)
+gem "langchainrb", "~> 0.19"
+gem "pgvector", "~> 0.3"       # if using pgvector for RAG
+gem "redis", "~> 5.0"
+
+# Option C: provider-specific gems (direct wrappers)
 gem "ruby-openai", "~> 7.0"
 gem "anthropic", "~> 0.3"
 gem "redis", "~> 5.0"
@@ -130,6 +140,18 @@ end
 ## Who This Is For
 
 Rails developers building LLM-powered features. Not ML engineers, not data scientists — Rails devs who want conventions, not frameworks. If you know ActionMailer and ActiveJob, you already know the patterns.
+
+## Compatible With
+
+| Gem | Support |
+|-----|---------|
+| [ruby_llm](https://github.com/crmne/ruby_llm) | Full (recommended) |
+| [langchain-rb](https://github.com/patterns-ai-core/langchainrb) | Full (RAG, vectors, agents) |
+| [ruby-openai](https://github.com/alexrudall/ruby-openai) | Full (OpenAI direct) |
+| [anthropic-rb](https://github.com/alexrudall/anthropic) | Full (Anthropic direct) |
+| [LiteLLM](https://github.com/BerriAI/litellm) | Full (proxy routing) |
+| [Portkey](https://portkey.ai) | Full (proxy routing) |
+| [Braintrust](https://braintrust.dev) | Full (eval pipeline) |
 
 ## Contributing
 

@@ -11,6 +11,12 @@
 # Routing maps task_type → model tier automatically.
 
 default: &default
+  # Client mode: which gem handles LLM calls
+  #   ruby_llm  — ruby_llm gem (recommended, multi-provider)
+  #   langchain — langchain-rb gem (for RAG, vector search, agents)
+  #   direct    — provider-specific gems (ruby-openai, anthropic-rb)
+  client_mode: ruby_llm
+
   # Proxy configuration (LiteLLM or Portkey)
   proxy:
     enabled: false

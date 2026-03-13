@@ -1,10 +1,42 @@
 # Client Setup
 
-The LLM client layer that wraps provider SDKs (`ruby-openai`, `anthropic-rb`) into
-a unified interface. This is the missing piece between your services and the actual
-API calls.
+The LLM client layer that wraps provider gems into a unified interface. This skill
+supports four gem choices — pick the one that fits your project, then wrap it in
+the same Rails conventions.
+
+## Choosing Your Gem
+
+| Gem | Best For | Multi-Provider | RAG/Vectors | Complexity |
+|-----|----------|----------------|-------------|------------|
+| **ruby_llm** | New projects, clean DSL | Yes (OpenAI, Anthropic, Gemini, etc.) | No | Low |
+| **langchain-rb** | RAG pipelines, agents, vector search | Yes | Yes (pgvector, Weaviate, Pinecone) | Medium |
+| **ruby-openai** | OpenAI-only projects | No (OpenAI only) | No | Low |
+| **anthropic-rb** | Anthropic-only projects | No (Anthropic only) | No | Low |
+
+**Recommendation:** Start with `ruby_llm` for most projects. Use `langchain-rb` if you
+need RAG, vector stores, or agent tooling. Use the provider-specific gems only if you're
+locked to a single provider and want the thinnest wrapper.
 
 ## Gems You Need
+
+### Option A: ruby_llm (recommended for most projects)
+
+```ruby
+# Gemfile
+gem "ruby_llm", "~> 1.0"        # Multi-provider LLM client (OpenAI, Anthropic, Gemini, etc.)
+gem "redis", "~> 5.0"           # Cost tracking, caching, rate limit state
+```
+
+### Option B: langchain-rb (for RAG and vector search)
+
+```ruby
+# Gemfile
+gem "langchainrb", "~> 0.19"    # LLM framework with RAG, agents, vector stores
+gem "pgvector", "~> 0.3"        # PostgreSQL vector extension (if using pgvector)
+gem "redis", "~> 5.0"           # Cost tracking, caching, rate limit state
+```
+
+### Option C: Provider-specific gems
 
 ```ruby
 # Gemfile
@@ -14,7 +46,7 @@ gem "faraday", "~> 2.0"         # HTTP client (used by both + proxy mode)
 gem "redis", "~> 5.0"           # Cost tracking, caching, rate limit state
 ```
 
-Optional:
+Optional (works with any option):
 
 ```ruby
 gem "tiktoken_ruby"              # Precise token counting (instead of char estimate)
@@ -40,15 +72,25 @@ module LLM
           provider: proxy["provider"]
         )
       else
-        provider = LLM.config.provider_for(model)
-        case provider
-        when "openai"
-          OpenAIClient.new
-        when "anthropic"
-          AnthropicClient.new
+        client_mode = LLM.config.client_mode  # "ruby_llm", "langchain", or "direct"
+
+        case client_mode
+        when "ruby_llm"
+          RubyLLMClient.new
+        when "langchain"
+          LangchainClient.new
         else
-          raise LLM::Error, "Unknown provider '#{provider}' for model '#{model}'. " \
-            "Check config/llm.yml models section."
+          # Direct provider-specific clients
+          provider = LLM.config.provider_for(model)
+          case provider
+          when "openai"
+            OpenAIClient.new
+          when "anthropic"
+            AnthropicClient.new
+          else
+            raise LLM::Error, "Unknown provider '#{provider}' for model '#{model}'. " \
+              "Check config/llm.yml models section."
+          end
         end
       end
     end
@@ -56,9 +98,328 @@ module LLM
 end
 ```
 
-## OpenAI Client
+## ruby_llm Client (Recommended)
 
-Wraps the `ruby-openai` gem:
+Wraps the `ruby_llm` gem — the most Rubyist LLM client. Handles OpenAI, Anthropic,
+Gemini, and more through a single, clean interface:
+
+```ruby
+# lib/llm/clients/ruby_llm_client.rb
+require "ruby_llm"
+
+module LLM
+  class RubyLLMClient
+    def initialize
+      configure_ruby_llm!
+    end
+
+    # Unified interface: returns a normalized response hash
+    def chat(model:, messages:, temperature: 0.0, max_tokens: 1024, **options, &block)
+      chat_instance = RubyLLM.chat(model: model)
+      chat_instance.with_temperature(temperature)
+      chat_instance.with_max_tokens(max_tokens)
+
+      system_prompt, user_messages = extract_system_prompt(messages)
+      chat_instance.with_instructions(system_prompt) if system_prompt
+
+      if block_given?
+        stream_chat(chat_instance, user_messages, model: model, &block)
+      else
+        last_user_message = user_messages.last[:content].to_s
+        response = chat_instance.ask(last_user_message)
+        normalize_response(response, model: model)
+      end
+    rescue RubyLLM::RateLimitError => e
+      raise LLM::RateLimitError, "Rate limited: #{e.message}"
+    rescue RubyLLM::UnauthorizedError => e
+      raise LLM::AuthenticationError, "Auth failed: #{e.message}"
+    rescue RubyLLM::PaymentRequiredError => e
+      raise LLM::BudgetExceededError, "Payment required: #{e.message}"
+    rescue RubyLLM::Error => e
+      raise_typed_error(e)
+    rescue Faraday::TimeoutError, Net::OpenTimeout, Net::ReadTimeout => e
+      raise LLM::TimeoutError, "Request timed out: #{e.message}"
+    end
+
+    private
+
+    def configure_ruby_llm!
+      RubyLLM.configure do |config|
+        config.openai_api_key = LLM.config.api_key_for("openai") ||
+          Rails.application.credentials.dig(:openai, :api_key) ||
+          ENV["OPENAI_API_KEY"]
+
+        config.anthropic_api_key = LLM.config.api_key_for("anthropic") ||
+          Rails.application.credentials.dig(:anthropic, :api_key) ||
+          ENV["ANTHROPIC_API_KEY"]
+
+        config.gemini_api_key = LLM.config.api_key_for("gemini") ||
+          Rails.application.credentials.dig(:gemini, :api_key) ||
+          ENV["GEMINI_API_KEY"]
+
+        config.request_timeout = 120
+      end
+    end
+
+    def extract_system_prompt(messages)
+      system_msg = messages.find { |m| m[:role].to_s == "system" }
+      user_msgs = messages.reject { |m| m[:role].to_s == "system" }
+      [system_msg&.dig(:content), user_msgs]
+    end
+
+    def normalize_response(response, model:)
+      {
+        choices: [
+          { message: { role: "assistant", content: response.content } }
+        ],
+        usage: {
+          input_tokens: response.input_tokens || 0,
+          output_tokens: response.output_tokens || 0
+        },
+        model: response.model || model
+      }
+    end
+
+    def stream_chat(chat_instance, user_messages, model:, &block)
+      full_content = +""
+      last_user_message = user_messages.last[:content].to_s
+
+      response = chat_instance.ask(last_user_message) do |chunk|
+        if chunk.content
+          full_content << chunk.content
+          yield({ choices: [{ delta: { content: chunk.content } }] })
+        end
+      end
+
+      {
+        choices: [{ message: { role: "assistant", content: full_content } }],
+        usage: {
+          input_tokens: response.input_tokens || 0,
+          output_tokens: response.output_tokens || 0
+        },
+        model: response.model || model
+      }
+    end
+
+    def raise_typed_error(error)
+      message = error.message
+      case message
+      when /rate limit/i, /429/
+        raise LLM::RateLimitError, message
+      when /content/i, /safety/i, /filter/i
+        raise LLM::ContentFilterError, message
+      else
+        raise LLM::Error, "LLM error: #{message}"
+      end
+    end
+  end
+end
+```
+
+### Why ruby_llm?
+
+```ruby
+# ruby_llm is idiomatic Ruby — chainable, clean, no Python-port smell
+chat = RubyLLM.chat(model: "gpt-4o-mini")
+chat.ask("Classify this ticket: #{ticket.subject}")
+
+# Multi-provider with zero config differences
+chat = RubyLLM.chat(model: "claude-sonnet-4-6")
+chat.ask("Same interface, different provider")
+
+# Works naturally with ActiveRecord via acts_as_chat
+class Conversation < ApplicationRecord
+  acts_as_chat
+end
+```
+
+## Langchain Client (For RAG Pipelines)
+
+Wraps the `langchain-rb` gem — use this when you need RAG, vector search, agents,
+or tool calling:
+
+```ruby
+# lib/llm/clients/langchain_client.rb
+require "langchainrb"
+
+module LLM
+  class LangchainClient
+    def initialize
+      @llm_instances = {}
+    end
+
+    # Unified interface: returns a normalized response hash
+    def chat(model:, messages:, temperature: 0.0, max_tokens: 1024, **options)
+      llm = llm_for(model)
+      prompt_text = build_prompt(messages)
+
+      response = llm.chat(messages: format_messages(messages))
+      normalize_response(response, model: model)
+    rescue Langchain::LLM::ApiError => e
+      raise_typed_error(e)
+    rescue Faraday::TooManyRequestsError => e
+      raise LLM::RateLimitError, "Rate limited: #{e.message}"
+    rescue Faraday::TimeoutError, Net::OpenTimeout, Net::ReadTimeout => e
+      raise LLM::TimeoutError, "Request timed out: #{e.message}"
+    end
+
+    # RAG-specific methods — the reason you'd choose langchain-rb
+
+    def embed(text:, model: "text-embedding-3-small")
+      llm = llm_for(model)
+      llm.embed(text: text).embedding
+    end
+
+    def similarity_search(query:, collection:, k: 5)
+      collection.similarity_search(query: query, k: k)
+    end
+
+    private
+
+    def llm_for(model)
+      provider = LLM.config.provider_for(model)
+
+      @llm_instances[provider] ||= case provider
+      when "openai"
+        Langchain::LLM::OpenAI.new(
+          api_key: resolve_key("openai"),
+          default_options: { chat_model: model }
+        )
+      when "anthropic"
+        Langchain::LLM::Anthropic.new(
+          api_key: resolve_key("anthropic"),
+          default_options: { chat_model: model }
+        )
+      when "google", "gemini"
+        Langchain::LLM::GoogleGemini.new(
+          api_key: resolve_key("gemini"),
+          default_options: { chat_model: model }
+        )
+      else
+        raise LLM::Error, "langchain-rb does not support provider '#{provider}'"
+      end
+    end
+
+    def resolve_key(provider)
+      LLM.config.api_key_for(provider) ||
+        Rails.application.credentials.dig(provider.to_sym, :api_key) ||
+        ENV["#{provider.upcase}_API_KEY"] ||
+        raise(LLM::AuthenticationError, "No #{provider} API key configured.")
+    end
+
+    def format_messages(messages)
+      messages.map do |msg|
+        { role: msg[:role].to_s, content: msg[:content].to_s }
+      end
+    end
+
+    def normalize_response(response, model:)
+      {
+        choices: [
+          { message: { role: "assistant", content: response.chat_completion } }
+        ],
+        usage: {
+          input_tokens: response.prompt_tokens || 0,
+          output_tokens: response.completion_tokens || 0
+        },
+        model: model
+      }
+    end
+
+    def build_prompt(messages)
+      messages.map { |m| m[:content].to_s }.join("\n\n")
+    end
+
+    def raise_typed_error(error)
+      message = error.message
+      case message
+      when /rate limit/i, /429/
+        raise LLM::RateLimitError, message
+      when /authentication/i, /401/, /unauthorized/i
+        raise LLM::AuthenticationError, message
+      when /content/i, /safety/i, /filter/i
+        raise LLM::ContentFilterError, message
+      else
+        raise LLM::Error, "Langchain error: #{message}"
+      end
+    end
+  end
+end
+```
+
+### When to use langchain-rb
+
+```ruby
+# RAG pipeline with pgvector — langchain-rb's killer feature
+vectorsearch = Langchain::Vectorsearch::Pgvector.new(
+  url: ENV["DATABASE_URL"],
+  index_name: "documents",
+  llm: Langchain::LLM::OpenAI.new(api_key: ENV["OPENAI_API_KEY"])
+)
+
+# Add documents
+vectorsearch.add_texts(texts: Document.pluck(:content))
+
+# Search with semantic similarity
+results = vectorsearch.similarity_search(query: "billing issues", k: 5)
+
+# RAG: search + generate in one step
+answer = vectorsearch.ask(question: "How do I reset my password?")
+```
+
+### Using langchain-rb with BaseService for RAG
+
+```ruby
+# app/services/llm/rag_answer_service.rb
+module LLM
+  class RagAnswerService < BaseService
+    self.task_type = :reasoning
+
+    private
+
+    def validate_params!(params)
+      raise ArgumentError, "question required" unless params[:question]
+      raise ArgumentError, "collection required" unless params[:collection]
+    end
+
+    def prompt_template
+      "rag/answer"
+    end
+
+    # Override execute_llm_call to include RAG context
+    def execute_llm_call(model:, prompt:)
+      client = LLM::Client.for(model)
+
+      # Retrieve relevant context via vector search
+      context_docs = client.similarity_search(
+        query: @params[:question],
+        collection: @params[:collection],
+        k: 5
+      )
+
+      # Inject context into the prompt
+      augmented_messages = prompt.map do |msg|
+        if msg[:role] == "user"
+          { role: "user", content: "Context:\n#{context_docs.join("\n")}\n\nQuestion: #{msg[:content]}" }
+        else
+          msg
+        end
+      end
+
+      client.chat(model: model, messages: augmented_messages)
+    end
+
+    def parse_response(response)
+      content = response.dig(:choices, 0, :message, :content)
+      { answer: content.strip }
+    end
+  end
+end
+```
+
+## OpenAI Client (Direct)
+
+Wraps the `ruby-openai` gem — use when you only need OpenAI and want the thinnest wrapper:
 
 ```ruby
 # lib/llm/clients/openai_client.rb
@@ -399,10 +760,15 @@ end
 
 ## Config Additions
 
-Add `provider_for` and `api_key_for` to the Config class:
+Add `client_mode`, `provider_for` and `api_key_for` to the Config class:
 
 ```ruby
 # Add these methods to lib/llm/config.rb (see proxy-routing.md for full class)
+
+# Which client gem to use: "ruby_llm" (default), "langchain", or "direct"
+def client_mode
+  @config.fetch("client_mode", "ruby_llm")
+end
 
 def provider_for(model_name)
   # Search all model tiers for a matching model name
@@ -496,8 +862,10 @@ lib/
   llm/
     client.rb                  # Factory: LLM::Client.for(model)
     clients/
-      openai_client.rb         # Wraps ruby-openai gem
-      anthropic_client.rb      # Wraps anthropic-rb gem
+      ruby_llm_client.rb      # Wraps ruby_llm gem (recommended)
+      langchain_client.rb     # Wraps langchain-rb gem (for RAG)
+      openai_client.rb         # Wraps ruby-openai gem (direct)
+      anthropic_client.rb      # Wraps anthropic-rb gem (direct)
       proxy_client.rb          # LiteLLM/Portkey via Faraday
       stub_client.rb           # Test double
     config.rb                  # Loads config/llm.yml
@@ -508,9 +876,12 @@ lib/
 
 ## Key Rules
 
-1. **All clients return the same response shape** -- Services never know which provider they're talking to
-2. **Error mapping happens in the client** -- Faraday errors become LLM::Error subclasses
-3. **API keys resolve in order**: config/llm.yml -> Rails credentials -> ENV vars
-4. **Proxy mode uses OpenAI-compatible endpoint** -- LiteLLM/Portkey both support /chat/completions
-5. **System prompts are handled per-provider** -- OpenAI uses a system message, Anthropic uses a system parameter
-6. **Test stub is a first-class client** -- No special-casing in services, just configure `provider: stub` in test env
+1. **All clients return the same response shape** -- ruby_llm, langchain-rb, ruby-openai, anthropic-rb — all normalize to `{choices, usage, model}`
+2. **Choose your gem, keep the convention** -- The Rails patterns (BaseService, BaseJob, Router) work identically regardless of which client gem you use
+3. **ruby_llm for most projects** -- Clean DSL, multi-provider, works with ActiveRecord via `acts_as_chat`. Start here unless you need RAG
+4. **langchain-rb for RAG** -- If you need vector search, pgvector, embeddings, or agents, langchain-rb is the right choice
+5. **Error mapping happens in the client** -- Provider-specific errors become LLM::Error subclasses. Services never rescue Faraday errors directly
+6. **API keys resolve in order**: config/llm.yml -> Rails credentials -> ENV vars
+7. **Proxy mode uses OpenAI-compatible endpoint** -- LiteLLM/Portkey both support /chat/completions
+8. **Test stub is a first-class client** -- No special-casing in services, just configure `provider: stub` in test env
+9. **Set `client_mode` in config/llm.yml** -- `ruby_llm` (default), `langchain`, or `direct` (provider-specific gems)

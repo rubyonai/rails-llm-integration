@@ -55,6 +55,65 @@ RSpec.configure do |config|
 end
 ```
 
+### Stubbing ruby_llm Directly
+
+If you're using `ruby_llm` and want to stub at the gem level instead of HTTP:
+
+```ruby
+# spec/support/ruby_llm_stubs.rb
+module RubyLLMStubs
+  def stub_ruby_llm_chat(content:, model: "gpt-4o-mini", input_tokens: 100, output_tokens: 50)
+    response = instance_double(RubyLLM::Response,
+      content: content,
+      model: model,
+      input_tokens: input_tokens,
+      output_tokens: output_tokens
+    )
+    chat_instance = instance_double(RubyLLM::Chat)
+    allow(chat_instance).to receive(:with_temperature).and_return(chat_instance)
+    allow(chat_instance).to receive(:with_max_tokens).and_return(chat_instance)
+    allow(chat_instance).to receive(:with_instructions).and_return(chat_instance)
+    allow(chat_instance).to receive(:ask).and_return(response)
+    allow(RubyLLM).to receive(:chat).and_return(chat_instance)
+  end
+end
+
+RSpec.configure do |config|
+  config.include RubyLLMStubs
+end
+```
+
+### Stubbing langchain-rb Directly
+
+```ruby
+# spec/support/langchain_stubs.rb
+module LangchainStubs
+  def stub_langchain_chat(content:, model: "gpt-4o-mini", input_tokens: 100, output_tokens: 50)
+    response = instance_double(Langchain::LLM::OpenAIResponse,
+      chat_completion: content,
+      prompt_tokens: input_tokens,
+      completion_tokens: output_tokens
+    )
+    llm = instance_double(Langchain::LLM::OpenAI)
+    allow(llm).to receive(:chat).and_return(response)
+    allow(Langchain::LLM::OpenAI).to receive(:new).and_return(llm)
+  end
+
+  def stub_langchain_embedding(embedding: Array.new(1536) { rand })
+    response = instance_double(Langchain::LLM::OpenAIResponse,
+      embedding: embedding
+    )
+    llm = instance_double(Langchain::LLM::OpenAI)
+    allow(llm).to receive(:embed).and_return(response)
+    allow(Langchain::LLM::OpenAI).to receive(:new).and_return(llm)
+  end
+end
+
+RSpec.configure do |config|
+  config.include LangchainStubs
+end
+```
+
 ### Testing a Service
 
 ```ruby
