@@ -1,0 +1,132 @@
+# frozen_string_literal: true
+
+# LLM::BaseService — Base class for all LLM service objects in <%= app_name %>
+#
+# Usage:
+#   class LLM::ProductDescriptionService < LLM::BaseService
+#     self.task_type = :generation
+#
+#     private
+#     def prompt_template = "product_descriptions/generate"
+#     def parse_response(response) = ...
+#   end
+#
+#   result = LLM::ProductDescriptionService.new.call(product: product)
+#   result.success? # => true
+#   result.value    # => { title: "...", description: "..." }
+
+module LLM
+  class BaseService
+    include Concerns::Traceable
+    include Concerns::Retryable
+    include Concerns::CostTrackable
+
+    # Override in subclass: :classification, :generation, :extraction, :reasoning, :summarization
+    class_attribute :task_type, default: :generation
+
+    # Override to pin a specific model (bypasses router)
+    class_attribute :model_name, default: nil
+
+    # -------------------------------------------------------------------
+    # Public API — call(**params) -> LLM::Result
+    # -------------------------------------------------------------------
+
+    def call(**params)
+      validate_params!(params)
+
+      with_tracing(input: params) do
+        with_retries do
+          model = resolve_model
+          prompt = render_prompt(params)
+
+          # Pre-flight cost check
+          LLM::TokenCounter.preflight_check!(
+            prompt_text: prompt.map { |m| m[:content] }.join,
+            model_config: LLM.config.route_for(self.class.task_type)
+          )
+
+          response = execute_llm_call(model: model, prompt: prompt)
+          parsed = parse_response(response)
+
+          cost = track_cost!(
+            model: model,
+            input_tokens: response.dig(:usage, :input_tokens) || 0,
+            output_tokens: response.dig(:usage, :output_tokens) || 0
+          )
+
+          LLM::Result.success(
+            parsed,
+            model: model,
+            trace_id: trace_id,
+            cost_usd: cost,
+            prompt_sha: current_prompt_sha
+          )
+        end
+      end
+    rescue LLM::BudgetExceededError => e
+      LLM::Result.failure(e, trace_id: trace_id)
+    rescue LLM::ContentFilterError => e
+      LLM::Result.failure(e, trace_id: trace_id)
+    rescue LLM::Error => e
+      LLM::Result.failure(e, trace_id: trace_id)
+    end
+
+    private
+
+    # -------------------------------------------------------------------
+    # Subclass hooks — override these
+    # -------------------------------------------------------------------
+
+    def validate_params!(params)
+      # Override to raise ArgumentError on invalid input
+    end
+
+    def prompt_template
+      raise NotImplementedError, "#{self.class} must define #prompt_template (e.g., 'product_descriptions/generate')"
+    end
+
+    def parse_response(response)
+      raise NotImplementedError, "#{self.class} must define #parse_response"
+    end
+
+    def temperature
+      0.0
+    end
+
+    def max_tokens
+      1024
+    end
+
+    # -------------------------------------------------------------------
+    # Base implementations
+    # -------------------------------------------------------------------
+
+    def resolve_model
+      model_name || LLM::Router.resolve(task_type: self.class.task_type)
+    end
+
+    def render_prompt(params)
+      LLM::PromptRenderer.render(prompt_template, **params)
+    end
+
+    def execute_llm_call(model:, prompt:)
+      client = LLM::Client.for(model)
+      client.chat(
+        model: model,
+        messages: prompt,
+        temperature: temperature,
+        max_tokens: max_tokens
+      )
+    rescue Faraday::TooManyRequestsError, Net::HTTPTooManyRequests
+      raise LLM::RateLimitError, "Rate limited by #{model}"
+    rescue Faraday::TimeoutError, Net::OpenTimeout, Net::ReadTimeout
+      raise LLM::TimeoutError, "Timeout calling #{model}"
+    end
+
+    def current_prompt_sha
+      path = Rails.root.join("app/prompts", "#{prompt_template}.text.erb")
+      return nil unless path.exist?
+      Digest::SHA256.file(path).hexdigest[0..7]
+    end
+  end
+end

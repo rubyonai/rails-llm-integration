@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+class CreateLlmEvalCases < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :llm_eval_cases do |t|
+      t.string :service_name, null: false
+      t.jsonb :input_data, null: false
+      t.jsonb :output_data
+      t.jsonb :expected_data
+      t.string :tags, array: true, default: []
+      t.string :source, default: "production"
+      t.datetime :captured_at, null: false
+      t.datetime :annotated_at
+      t.timestamps
+    end
+
+    add_index :llm_eval_cases, :service_name
+    add_index :llm_eval_cases, :tags, using: :gin
+    add_index :llm_eval_cases, :captured_at
+  end
+end

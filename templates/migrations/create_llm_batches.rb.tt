@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+class CreateLlmBatches < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :llm_batches do |t|
+      t.string :job_class, null: false
+      t.jsonb :record_ids, null: false, default: []
+      t.integer :status, null: false, default: 0  # enum: pending, processing, completed, failed
+      t.integer :total_count, null: false, default: 0
+      t.integer :completed_count, null: false, default: 0
+      t.integer :failed_count, null: false, default: 0
+      t.decimal :progress_pct, precision: 5, scale: 1, default: 0.0
+      t.datetime :started_at
+      t.datetime :finished_at
+      t.timestamps
+    end
+
+    add_index :llm_batches, :status
+
+    create_table :llm_batch_failures do |t|
+      t.references :llm_batch, null: false, foreign_key: { to_table: :llm_batches }
+      t.string :record_type, null: false
+      t.bigint :record_id, null: false
+      t.text :error_message
+      t.timestamps
+    end
+  end
+end

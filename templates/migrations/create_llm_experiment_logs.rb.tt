@@ -1,0 +1,24 @@
+# frozen_string_literal: true
+
+class CreateLlmExperimentLogs < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :llm_experiment_logs do |t|
+      t.string :experiment_name, null: false
+      t.string :primary_model, null: false
+      t.string :shadow_model, null: false
+      t.string :prompt_hash, null: false
+      t.text :primary_output
+      t.text :shadow_output
+      t.decimal :primary_score, precision: 5, scale: 3
+      t.decimal :shadow_score, precision: 5, scale: 3
+      t.decimal :primary_cost, precision: 10, scale: 6
+      t.decimal :shadow_cost, precision: 10, scale: 6
+      t.timestamps
+    end
+
+    add_index :llm_experiment_logs, :experiment_name
+    add_index :llm_experiment_logs, :created_at
+    add_index :llm_experiment_logs, [:experiment_name, :primary_score],
+      name: "idx_llm_experiments_scoring"
+  end
+end

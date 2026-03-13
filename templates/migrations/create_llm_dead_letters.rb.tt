@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+class CreateLlmDeadLetters < ActiveRecord::Migration<%= migration_version %>
+  def change
+    create_table :llm_dead_letters do |t|
+      t.string :job_class_name, null: false
+      t.string :job_id, null: false
+      t.jsonb :arguments, default: []
+      t.string :error_class, null: false
+      t.text :error_message
+      t.datetime :failed_at, null: false
+      t.datetime :resolved_at
+      t.string :resolution
+      t.timestamps
+    end
+
+    add_index :llm_dead_letters, :resolved_at
+    add_index :llm_dead_letters, :error_class
+    add_index :llm_dead_letters, :failed_at
+  end
+end

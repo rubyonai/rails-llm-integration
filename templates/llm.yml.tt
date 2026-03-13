@@ -1,0 +1,109 @@
+# LLM Configuration for <%= app_name %>
+#
+# This file configures LLM providers, models, routing, and budgets.
+# Works like database.yml — one section per environment.
+#
+# Model tiers:
+#   cheap    — Fast, low-cost models for simple tasks (classification, extraction)
+#   standard — Balanced models for most tasks (generation, summarization)
+#   expensive — Top-tier models for complex reasoning
+#
+# Routing maps task_type → model tier automatically.
+
+default: &default
+  # Proxy configuration (LiteLLM or Portkey)
+  proxy:
+    enabled: false
+    # provider: litellm
+    # base_url: http://localhost:4000
+    # api_key: <%%= ENV["LITELLM_API_KEY"] %>
+
+  # Budget guardrails
+  daily_budget_usd: 50.00
+  per_request_max_usd: 0.50
+  alert_threshold_pct: 80
+
+  # Model definitions
+  models:
+    cheap:
+      provider: openai
+      model: gpt-4o-mini
+      max_tokens: 4096
+      cost_per_1m_input: 0.15
+      cost_per_1m_output: 0.60
+    standard:
+      provider: anthropic
+      model: claude-sonnet-4-6
+      max_tokens: 8192
+      cost_per_1m_input: 3.00
+      cost_per_1m_output: 15.00
+    expensive:
+      provider: anthropic
+      model: claude-opus-4-6
+      max_tokens: 4096
+      cost_per_1m_input: 15.00
+      cost_per_1m_output: 75.00
+
+  # Task-type → model tier routing
+  routing:
+    classification: cheap
+    extraction: cheap
+    generation: standard
+    summarization: standard
+    reasoning: expensive
+
+  # Fallback chain when primary model fails
+  # Tries each tier in order, then falls back to cache
+  fallback_chain:
+    - standard
+    - cheap
+    - cached
+
+  # Provider API keys (use credentials or ENV)
+  api_keys:
+    openai: <%%= ENV["OPENAI_API_KEY"] %>
+    anthropic: <%%= ENV["ANTHROPIC_API_KEY"] %>
+
+development:
+  <<: *default
+  daily_budget_usd: 5.00
+  per_request_max_usd: 0.10
+
+test:
+  <<: *default
+  daily_budget_usd: 0.00
+  per_request_max_usd: 0.00
+  models:
+    cheap:
+      provider: stub
+      model: test-model-cheap
+      max_tokens: 4096
+      cost_per_1m_input: 0.00
+      cost_per_1m_output: 0.00
+    standard:
+      provider: stub
+      model: test-model-standard
+      max_tokens: 8192
+      cost_per_1m_input: 0.00
+      cost_per_1m_output: 0.00
+    expensive:
+      provider: stub
+      model: test-model-expensive
+      max_tokens: 4096
+      cost_per_1m_input: 0.00
+      cost_per_1m_output: 0.00
+
+staging:
+  <<: *default
+  daily_budget_usd: 20.00
+  per_request_max_usd: 0.50
+
+production:
+  <<: *default
+  daily_budget_usd: 500.00
+  per_request_max_usd: 2.00
+  proxy:
+    enabled: true
+    provider: litellm
+    base_url: <%%= ENV["LITELLM_PROXY_URL"] %>
+    api_key: <%%= ENV["LITELLM_API_KEY"] %>

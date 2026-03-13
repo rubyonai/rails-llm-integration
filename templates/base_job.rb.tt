@@ -1,0 +1,134 @@
+# frozen_string_literal: true
+
+# LLM::BaseJob — Base class for all async LLM jobs in <%= app_name %>
+#
+# Queue strategy:
+#   :llm_critical  — User-blocking work (chat, real-time classification)
+#   :llm_calls     — Standard async work (generate descriptions, summarize)
+#   :llm_bulk      — Batch operations (overnight processing, backfills)
+#
+# Usage:
+#   class LLM::GenerateDescriptionJob < LLM::BaseJob
+#     queue_as :llm_calls
+#
+#     def perform(product_id)
+#       product = Product.find(product_id)
+#       @result = LLM::ProductDescriptionService.new.call(product: product)
+#       raise @result.error if @result.failure?
+#       product.update!(ai_description: @result.value[:description])
+#     end
+#   end
+
+module LLM
+  class BaseJob < ApplicationJob
+    queue_as :llm_calls
+
+    # -----------------------------------------------------------------
+    # Retry strategy — mapped to error taxonomy
+    # -----------------------------------------------------------------
+
+    # Transient errors: retry with backoff
+    retry_on LLM::RateLimitError,
+             wait: :polynomially_longer,
+             attempts: 5
+
+    retry_on LLM::TimeoutError,
+             wait: 30.seconds,
+             attempts: 3
+
+    retry_on Net::OpenTimeout,
+             wait: 1.minute,
+             attempts: 3
+
+    retry_on Net::ReadTimeout,
+             wait: 1.minute,
+             attempts: 3
+
+    # Permanent errors: don't retry, they won't get better
+    discard_on LLM::ContentFilterError do |job, error|
+      job.send(:handle_permanent_failure, error)
+    end
+
+    discard_on LLM::AuthenticationError do |job, error|
+      job.send(:handle_permanent_failure, error)
+    end
+
+    discard_on LLM::BudgetExceededError do |job, error|
+      job.send(:handle_permanent_failure, error)
+    end
+
+    # Catch-all for unknown LLM errors after retries exhausted
+    retry_on LLM::Error, attempts: 2 do |job, error|
+      job.send(:handle_permanent_failure, error)
+    end
+
+    # -----------------------------------------------------------------
+    # Callbacks
+    # -----------------------------------------------------------------
+
+    after_perform do |job|
+      log_job_completion(job)
+    end
+
+    private
+
+    # -----------------------------------------------------------------
+    # Cost & completion logging
+    # -----------------------------------------------------------------
+
+    def log_job_completion(job)
+      return unless defined?(@result) && @result.respond_to?(:metadata)
+
+      metadata = {
+        job_class: self.class.name,
+        job_id: job.job_id,
+        queue: queue_name,
+        success: @result.success?
+      }
+
+      if @result.success?
+        metadata[:model] = @result.metadata[:model]
+        metadata[:cost_usd] = @result.metadata[:cost_usd]
+        metadata[:trace_id] = @result.metadata[:trace_id]
+      end
+
+      Rails.logger.info("LLM Job Completed", **metadata)
+    end
+
+    # -----------------------------------------------------------------
+    # Permanent failure handling
+    # -----------------------------------------------------------------
+
+    def handle_permanent_failure(error)
+      # Log to dead letter table for review
+      if defined?(LLM::DeadLetter)
+        LLM::DeadLetter.create!(
+          job_class_name: self.class.name,
+          job_id: provider_job_id || job_id,
+          arguments: arguments,
+          error_class: error.class.name,
+          error_message: error.message,
+          failed_at: Time.current
+        )
+      end
+
+      # Log for monitoring
+      Rails.logger.error(
+        "LLM Job Permanently Failed",
+        job_class: self.class.name,
+        job_id: provider_job_id || job_id,
+        error_class: error.class.name,
+        error_message: error.message,
+        arguments: arguments
+      )
+
+      # Alert via error tracker
+      if defined?(Sentry)
+        Sentry.capture_exception(error, extra: {
+          job_class: self.class.name,
+          arguments: arguments
+        })
+      end
+    end
+  end
+end
