@@ -83,24 +83,27 @@ Create a ticket classification service using ruby_llm
 
 Claude reads the skill's reference docs and generates code following these conventions.
 
-## What's Inside
+## Reference Docs
 
-| Reference | What It Covers |
-|-----------|---------------|
-| [client-setup.md](references/client-setup.md) | ruby_llm, langchain-rb, ruby-openai, anthropic-rb wrappers. All return the same normalized response shape |
-| [service-patterns.md](references/service-patterns.md) | BaseService, Result pattern, Traceable / Retryable / CostTrackable concerns, error types |
-| [job-patterns.md](references/job-patterns.md) | Three-queue Sidekiq strategy, typed retry rules, batch processing, dead letter handling |
-| [proxy-routing.md](references/proxy-routing.md) | config/llm.yml, model routing, shadow experiments, LiteLLM / Portkey, budget guardrails |
-| [eval-pipeline.md](references/eval-pipeline.md) | Braintrust logging, LLM-as-judge, eval datasets from production, CI gates |
-| [prompt-management.md](references/prompt-management.md) | ERB templates in app/prompts/, partials, i18n, prompt versioning via git SHA |
-| [testing-guide.md](references/testing-guide.md) | WebMock stubs, VCR cassettes, shared RSpec examples, CI strategy |
-| [generators.md](references/generators.md) | `llm:install` and `llm:service` Rails generators |
+```
+references/
+  client-setup.md        # ruby_llm, langchain-rb, ruby-openai, anthropic-rb
+  service-patterns.md    # BaseService, Result, concerns, error types
+  job-patterns.md        # Sidekiq queues, retry rules, batch processing
+  proxy-routing.md       # config/llm.yml, model routing, budget caps
+  eval-pipeline.md       # Braintrust, LLM-as-judge, CI gates
+  prompt-management.md   # ERB templates in app/prompts/
+  testing-guide.md       # WebMock, VCR, shared examples, CI strategy
+  generators.md          # llm:install and llm:service generators
 
-Also includes generator templates, migration templates, and a codebase audit script:
+templates/
+  base_service.rb.tt     # BaseService with concerns
+  base_job.rb.tt         # BaseJob with retry rules
+  llm.yml.tt             # Model routing and budget config
+  migrations/            # Batches, dead letters, eval cases, experiments
 
-```bash
-# Finds raw API calls, hardcoded prompts, missing cost tracking, sync calls in controllers
-ruby scripts/audit_llm_usage.rb /path/to/your/app
+scripts/
+  audit_llm_usage.rb     # Finds anti-patterns in your codebase
 ```
 
 ## Who This Is For
