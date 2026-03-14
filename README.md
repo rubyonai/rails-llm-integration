@@ -107,7 +107,7 @@ ruby scripts/audit_llm_usage.rb /path/to/your/app
 
 Rails developers adding LLM features to production apps. If you know ActionMailer and ActiveJob, you already know the patterns. This skill teaches Claude to use them for LLM calls.
 
-## Compatible With
+## Covers
 
 | | Gem | Use Case |
 |-|-----|----------|
