@@ -38,9 +38,15 @@ def create
 end
 ```
 
-It works, but it doesn't scale. There's no retry when you get rate limited, no way to know what you're spending, prompts are strings scattered across files, and every developer does it differently.
+It works, but it doesn't scale:
 
-This skill gives Claude Code a set of Rails conventions for LLM calls so it generates consistent, structured code whenever you ask it to build AI features.
+- **No retries.** Rate limits and transient failures fail silently.
+- **No cost visibility.** You can't tell what you're spending per request or per day.
+- **Scattered prompts.** Prompt strings live inline across controllers, services, and rake tasks.
+- **No consistency.** Every developer wires up LLM calls their own way.
+
+> [!IMPORTANT]
+> This skill gives Claude Code a set of Rails conventions for LLM calls so it generates consistent, structured code whenever you ask it to build AI features.
 
 ## What It Looks Like
 
@@ -104,50 +110,67 @@ Then open Claude Code in your Rails project and ask it to build a feature:
 > Create a ticket classification service using ruby_llm
 ```
 
-Claude reads the skill's reference docs and generates code following these conventions.
+> [!NOTE]
+> Claude reads the skill's reference docs and generates code following these conventions.
 
 ## Reference Docs
 
-```
-references/
-  client-setup.md        # ruby_llm, langchain-rb, ruby-openai, anthropic-rb
-  service-patterns.md    # BaseService, Result, concerns, error types
-  job-patterns.md        # Sidekiq queues, retry rules, batch processing
-  proxy-routing.md       # config/llm.yml, model routing, budget caps
-  eval-pipeline.md       # Braintrust, LLM-as-judge, CI gates
-  prompt-management.md   # ERB templates in app/prompts/
-  testing-guide.md       # WebMock, VCR, shared examples, CI strategy
-  generators.md          # llm:install and llm:service generators
+**`references/`**
 
-templates/
-  base_service.rb.tt     # BaseService with concerns
-  base_job.rb.tt         # BaseJob with retry rules
-  llm.yml.tt             # Model routing and budget config
-  migrations/            # Batches, dead letters, eval cases, experiments
+| File | Covers |
+|------|--------|
+| `client-setup.md` | ruby_llm, langchain-rb, ruby-openai, anthropic-rb |
+| `service-patterns.md` | BaseService, Result, concerns, error types |
+| `job-patterns.md` | Sidekiq queues, retry rules, batch processing |
+| `proxy-routing.md` | config/llm.yml, model routing, budget caps |
+| `eval-pipeline.md` | Braintrust, LLM-as-judge, CI gates |
+| `prompt-management.md` | ERB templates in app/prompts/ |
+| `testing-guide.md` | WebMock, VCR, shared examples, CI strategy |
+| `generators.md` | llm:install and llm:service generators |
 
-scripts/
-  audit_llm_usage.rb     # Finds anti-patterns in your codebase
-```
+**`templates/`**
+
+| File | Covers |
+|------|--------|
+| `base_service.rb.tt` | BaseService with concerns |
+| `base_job.rb.tt` | BaseJob with retry rules |
+| `llm.yml.tt` | Model routing and budget config |
+| `migrations/` | Batches, dead letters, eval cases, experiments |
+
+**`scripts/`**
+
+| File | Covers |
+|------|--------|
+| `audit_llm_usage.rb` | Finds anti-patterns in your codebase |
 
 ## Who This Is For
 
-Rails developers adding LLM features to production apps. If you know ActionMailer and ActiveJob, you already know the patterns. This skill teaches Claude to use them for LLM calls.
+Rails developers shipping LLM features to production.
 
 ## Covers
 
-| | Gem | Use Case |
-|-|-----|----------|
-| Recommended | [ruby_llm](https://github.com/crmne/ruby_llm) | Multi-provider, clean DSL, ActiveRecord integration |
-| For RAG | [langchain-rb](https://github.com/patterns-ai-core/langchainrb) | Vector search, pgvector, embeddings, agents |
-| Direct | [ruby-openai](https://github.com/alexrudall/ruby-openai) | OpenAI-only projects |
-| Direct | [anthropic-rb](https://github.com/alexrudall/anthropic) | Anthropic-only projects |
-| Proxy | [LiteLLM](https://github.com/BerriAI/litellm) / [Portkey](https://portkey.ai) | Multi-provider routing, cost tracking |
-| Evals | [Braintrust](https://braintrust.dev) | Trace logging, quality scoring, CI gates |
+| Category | Gem | Use Case |
+|----------|-----|----------|
+| **Recommended** | [ruby_llm](https://github.com/crmne/ruby_llm) | Multi-provider, clean DSL, ActiveRecord integration |
+| **RAG** | [langchain-rb](https://github.com/patterns-ai-core/langchainrb) | Vector search, pgvector, embeddings, agents |
+| **Direct** | [ruby-openai](https://github.com/alexrudall/ruby-openai) | OpenAI-only projects |
+| **Direct** | [anthropic-rb](https://github.com/alexrudall/anthropic) | Anthropic-only projects |
+| **Proxy** | [LiteLLM](https://github.com/BerriAI/litellm) / [Portkey](https://portkey.ai) | Multi-provider routing, cost tracking |
+| **Evals** | [Braintrust](https://braintrust.dev) | Trace logging, quality scoring, CI gates |
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Every pattern should come from real production use. Code blocks should be copy-pasteable into a Rails app.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+- **Production-proven.** Every pattern must come from real production use.
+- **Copy-pasteable.** Code blocks should drop into a Rails app as-is.
 
 ## License
 
-[MIT](LICENSE) - Ruby on AI
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <em>Claude Code is powerful. This skill makes it consistent.</em>
+</p>
