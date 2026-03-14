@@ -40,7 +40,7 @@ end
 
 It works, but it doesn't scale. There's no retry when you get rate limited, no way to know what you're spending, prompts are strings scattered across files, and every developer does it differently.
 
-This skill gives Claude Code a set of Rails conventions for LLM calls. Install it once, and Claude starts using them whenever you ask it to build AI features.
+This skill gives Claude Code a set of Rails conventions for LLM calls so it generates consistent, structured code whenever you ask it to build AI features.
 
 ## What It Looks Like
 
@@ -65,7 +65,7 @@ config/
   llm.yml                            # Model routing + budget caps (like database.yml)
 ```
 
-Same structure for every LLM feature. A new developer joining the team knows where things go on day one.
+Same structure for every LLM feature in your app.
 
 ## Installation
 
@@ -76,9 +76,9 @@ cp -r rails-llm-integration/ your-rails-app/.claude/skills/rails-llm-integration
 Then open Claude Code in your Rails project and ask it to add an LLM feature:
 
 ```
-"Add AI-powered product descriptions to my app"
-"Set up LLM service objects with cost tracking"
-"Create a ticket classification service using ruby_llm"
+Add AI-powered product descriptions to my app
+Set up LLM service objects with cost tracking
+Create a ticket classification service using ruby_llm
 ```
 
 Claude reads the skill's reference docs and generates code following these conventions.
