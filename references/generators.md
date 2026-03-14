@@ -189,7 +189,7 @@ module LLM
     private
 
     def validate_params!(params)
-      # TODO: Add parameter validation
+      # Add your parameter validation here, e.g.:
       # raise ArgumentError, "record required" unless params[:record]
     end
 
@@ -201,7 +201,7 @@ module LLM
       content = response.dig(:choices, 0, :message, :content)
       raise LLM::InvalidResponseError, "Empty response" if content.blank?
 
-      # TODO: Parse the response into a structured hash
+      # Parse the response into a structured hash for your use case
       { result: content.strip }
     end
 <% if task_type == "generation" %>
@@ -228,15 +228,15 @@ require "rails_helper"
 
 RSpec.describe LLM::<%= class_name %>Service do
   it_behaves_like "an LLM service", described_class do
-    let(:valid_params) { { } }  # TODO: Add valid params
-    let(:valid_response_content) { "TODO: sample response" }
+    let(:valid_params) { { record: build(:record) } }
+    let(:valid_response_content) { "Sample response for your service" }
   end
 
   describe "#call" do
     it "returns parsed result on success" do
-      stub_llm_response(model: "gpt-4o-mini", content: "TODO: sample response")
+      stub_llm_response(model: "gpt-4o-mini", content: "Sample response for your service")
 
-      result = described_class.new.call  # TODO: Add params
+      result = described_class.new.call(record: build(:record))
 
       expect(result).to be_success
       expect(result.value[:result]).to be_present

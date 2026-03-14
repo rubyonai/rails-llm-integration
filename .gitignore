@@ -2,3 +2,5 @@ build/
 .DS_Store
 *.swp
 *.swo
+.planning/
+.claude/

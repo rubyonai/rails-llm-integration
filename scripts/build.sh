@@ -17,6 +17,8 @@ cd "$PROJECT_DIR"
 zip -r "$OUTPUT_FILE" . \
   -x ".git/*" \
   -x "build/*" \
+  -x ".planning/*" \
+  -x ".claude/*" \
   -x "**/.DS_Store" \
   -x ".DS_Store"
 

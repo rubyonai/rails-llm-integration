@@ -1,5 +1,10 @@
 # Rails LLM Integration — Claude Skill
 
+[![Ruby](https://img.shields.io/badge/Ruby-3.2%2B-red)](https://www.ruby-lang.org/)
+[![Rails](https://img.shields.io/badge/Rails-7.1%2B-red)](https://rubyonrails.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Claude Skill](https://img.shields.io/badge/Claude-Skill-blueviolet)](https://docs.anthropic.com/en/docs/claude-code/skills)
+
 **Stop scattering raw API calls across your Rails app.** This Claude skill teaches production-grade LLM integration patterns that follow Rails conventions — treating AI calls the way Rails treats email (ActionMailer), jobs (ActiveJob), and config (database.yml). Works with **ruby_llm**, **langchain-rb**, **ruby-openai**, and **anthropic-rb**.
 
 ## The Problem
