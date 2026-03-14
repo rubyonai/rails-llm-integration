@@ -204,49 +204,35 @@ end
 
 ## Quick Start
 
-Once the skill is installed, Claude Code uses these conventions when setting up your app:
-
-**1. Pick your gem**
-
-```ruby
-# Gemfile
-
-gem "ruby_llm", "~> 1.0"         # Recommended: multi-provider, clean Ruby DSL
-gem "langchainrb", "~> 0.19"     # For RAG, vector search, agents
-gem "ruby-openai", "~> 7.0"      # OpenAI only
-gem "anthropic", "~> 0.3"        # Anthropic only
-```
-
-**2. Generate the stack**
+**1. Install the skill**
 
 ```bash
-rails generate llm:install
-rails db:migrate
+cp -r rails-llm-integration/ your-rails-app/.claude/skills/rails-llm-integration/
 ```
 
-**3. Add API keys**
+**2. Ask Claude Code to set up LLM integration**
 
-```bash
-rails credentials:edit
-# openai:
-#   api_key: sk-...
-# anthropic:
-#   api_key: sk-ant-...
+Open Claude Code in your Rails project and ask it to add an LLM feature. For example:
+
+```
+"Add AI-powered product descriptions to my app"
+"Set up LLM service objects with cost tracking"
+"Create a ticket classification service using ruby_llm"
 ```
 
-**4. Create your first service**
+Claude reads the skill's reference docs and generates code following the conventions: BaseService subclass, async job, prompt template, config, and tests.
 
-```bash
-rails generate llm:service ProductDescription generation
-```
+**3. Audit existing LLM code (optional)**
 
-**5. Audit existing code**
+If your app already has LLM calls, the included audit script finds anti-patterns:
 
 ```bash
 ruby scripts/audit_llm_usage.rb /path/to/your/app
 ```
 
-The audit script looks for raw API calls, hardcoded prompts, missing cost tracking, and sync LLM calls in controllers. It tells you what to fix and where.
+It reports raw API calls outside services, sync calls in controllers, hardcoded prompts, and missing cost tracking, with file and line number for each finding.
+
+> **Note:** This is a Claude Skill, not a Ruby gem. It doesn't install anything into your app directly. It teaches Claude Code the right patterns so the code Claude writes for you follows Rails conventions. The reference docs, templates, and code examples are all designed to be read by Claude and used as a basis for what it generates.
 
 ## What's Inside
 
@@ -261,7 +247,7 @@ The audit script looks for raw API calls, hardcoded prompts, missing cost tracki
 | [testing-guide.md](references/testing-guide.md) | WebMock stubs, VCR cassettes, shared RSpec examples, CI strategy |
 | [generators.md](references/generators.md) | `llm:install` and `llm:service` Rails generators |
 
-Also includes 3 generator templates, 4 migration templates, and a codebase audit script.
+Also includes 3 generator templates (`.tt` files showing what generated code should look like), 4 migration templates, and a runnable codebase audit script.
 
 ## Who This Is For
 
