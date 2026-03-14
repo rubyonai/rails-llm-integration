@@ -65,6 +65,29 @@ config/
   llm.yml                            # Model routing + budget caps (like database.yml)
 ```
 
+Each service follows the same pattern:
+
+```ruby
+module LLM
+  class ProductDescriptionService < BaseService
+    self.task_type = :generation    # Routes to the right model automatically
+
+    def validate_params!(params)
+      raise ArgumentError, "product required" unless params[:product]
+    end
+
+    def prompt_template
+      "product_descriptions/generate"
+    end
+
+    def parse_response(response)
+      content = response.dig(:choices, 0, :message, :content)
+      { description: content.strip }
+    end
+  end
+end
+```
+
 Same structure for every LLM feature in your app.
 
 ## Installation
@@ -73,12 +96,12 @@ Same structure for every LLM feature in your app.
 cp -r rails-llm-integration/ your-rails-app/.claude/skills/rails-llm-integration/
 ```
 
-Then open Claude Code in your Rails project and ask it to add an LLM feature:
+Then open Claude Code in your Rails project and ask it to build a feature:
 
 ```
-Add AI-powered product descriptions to my app
-Set up LLM service objects with cost tracking
-Create a ticket classification service using ruby_llm
+> Add AI-powered product descriptions to my app
+> Set up LLM service objects with cost tracking
+> Create a ticket classification service using ruby_llm
 ```
 
 Claude reads the skill's reference docs and generates code following these conventions.
